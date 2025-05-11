@@ -19,6 +19,8 @@
         packages = with pkgs; [
           python311
           portaudio
+          codec2
+          sox
         ];
       in
       {
