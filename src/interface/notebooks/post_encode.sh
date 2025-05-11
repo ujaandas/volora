@@ -1,3 +1,3 @@
 #!/bin/bash
 
-sox -r 8000 -e signed-integer -b 16 output.raw output.wav
+sox -r 8000 -b 16 -e signed-integer output.raw output.wav

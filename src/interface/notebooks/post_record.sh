@@ -1,3 +1,3 @@
 #!/bin/bash
 
-sox input.wav -e signed-integer -b 16 input.raw channels 1 rate 8000
+sox -r 8000 -b 16 -c 1 -e signed-integer input.wav input.raw
