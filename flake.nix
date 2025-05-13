@@ -24,14 +24,14 @@
             version = "0.1.0";
             src = ./app;
 
-            nativeBuildInputs = [ pkgs.portaudio ];
+            nativeBuildInputs = with pkgs; [ portaudio ];
 
-            buildInputs = [ pkgs.cowsay ];
+            buildInputs = with pkgs; [ cowsay ];
 
-            propagatedBuildInputs = [ pkgs.python3Packages.pyaudio ];
+            propagatedBuildInputs = with pkgs.python3Packages; [ pyaudio ];
 
             meta = with pkgs.lib; {
-              description = "A basic Python package that prints greeting via cowsay, with PyAudio and PortAudio dependencies";
+              description = "Volora";
               license = licenses.mit;
               platforms = platforms.all;
             };
