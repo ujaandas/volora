@@ -86,11 +86,31 @@
 
         devShell = pkgs.mkShell {
           buildInputs = with pkgs; [
-            python3
             cowsay
-            python3Packages.pip
+            portaudio
+            sox
+            (python3.withPackages (
+              ps: with ps; [
+                ipykernel
+                pyaudio
+                soxr
+                pycodec2
+              ]
+            ))
           ];
+
+          shellHook = ''
+            VENV_DIR=".venv"
+            echo "Checking for virtual environment in $${VENV_DIR}..."
+            if [ ! -d "$VENV_DIR" ]; then
+              echo "No virtual environment found. Creating one with --system-site-packages..."
+              python -m venv --system-site-packages "$VENV_DIR"
+            fi
+            echo "Activating virtual environment..."
+            . "$VENV_DIR/bin/activate"
+          '';
         };
+
       }
     );
 }
