@@ -1,102 +1,95 @@
 {
-  description = "Hello world flake using uv2nix";
+  description = "peepee poopoo";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-
-    pyproject-nix = {
-      url = "github:pyproject-nix/pyproject.nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    uv2nix = {
-      url = "github:pyproject-nix/uv2nix";
-      inputs.pyproject-nix.follows = "pyproject-nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    pyproject-build-systems = {
-      url = "github:pyproject-nix/build-system-pkgs";
-      inputs.pyproject-nix.follows = "pyproject-nix";
-      inputs.uv2nix.follows = "uv2nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    flake-utils = {
-      url = "github:numtide/flake-utils";
-    };
+    flake-utils.url = "github:numtide/flake-utils";
   };
 
   outputs =
     {
       self,
       nixpkgs,
-      uv2nix,
-      pyproject-nix,
-      pyproject-build-systems,
       flake-utils,
-      ...
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        inherit (nixpkgs) lib;
-        workspace = uv2nix.lib.workspace.loadWorkspace { workspaceRoot = ./.; };
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [
+            (final: prev: {
+              pycodec2 = prev.python3Packages.buildPythonPackage {
+                pname = "pycodec2";
+                version = "4.1.0";
 
-        overlay = workspace.mkPyprojectOverlay {
-          sourcePreference = "wheel";
+                src = prev.fetchPypi {
+                  pname = "pycodec2";
+                  version = "4.1.0";
+                  sha256 = "46a491f4c8e2328cb633b40ef6dccbd2ea08da51f6b76e795c4d7a439f8d355b";
+                };
+
+                buildInputs = with pkgs; [
+                  codec2
+                ];
+
+                propagatedBuildInputs = with prev.python3Packages; [
+                  cython
+                  numpy
+                ];
+
+                meta = with prev.lib; {
+                  description = "Python binding for codec2";
+                  license = prev.lib.licenses.mit;
+                  platforms = prev.lib.platforms.all;
+                };
+
+              };
+            })
+          ];
         };
-
-        pkgs = nixpkgs.legacyPackages.${system};
-        python = pkgs.python312;
-
-        pythonSet =
-          (pkgs.callPackage pyproject-nix.build.packages {
-            inherit python;
-          }).overrideScope
-            (
-              lib.composeManyExtensions [
-                pyproject-build-systems.overlays.default
-                overlay
-              ]
-            );
-
-        interface = pythonSet.mkVirtualEnv "interface-env" workspace.deps.default;
       in
-      rec {
-        packages = {
-          default = interface;
-        };
-        defaultPackage = interface;
+      {
+        packages = rec {
+          volora = pkgs.python3Packages.buildPythonPackage {
+            pname = "volora";
+            version = "0.1.0";
+            src = ./app;
 
-        apps = {
-          default = {
-            type = "app";
-            program = "${interface}/bin/interface";
+            nativeBuildInputs = with pkgs; [
+              codec2
+              portaudio
+              sox
+            ];
+
+            buildInputs = with pkgs; [ cowsay ];
+
+            propagatedBuildInputs = with pkgs; [
+              pycodec2
+              python3Packages.pyaudio
+              python3Packages.soxr
+            ];
+
+            meta = with pkgs.lib; {
+              description = "Volora";
+              license = licenses.mit;
+              platforms = platforms.all;
+            };
+
+            postFixup = ''
+              wrapProgram $out/bin/volora --prefix PATH : ${pkgs.cowsay}/bin
+            '';
           };
+
+          default = volora;
         };
-        defaultApp = apps.default;
 
         devShell = pkgs.mkShell {
-          buildInputs = [
-            python
-            pkgs.uv
-            pkgs.portaudio
-            pkgs.codec2
-            pkgs.sox
-            pkgs.cowsay
+          buildInputs = with pkgs; [
+            python3
+            cowsay
+            python3Packages.pip
           ];
-          env =
-            {
-              UV_PYTHON_DOWNLOADS = "never";
-              UV_PYTHON = python.interpreter;
-            }
-            // lib.optionalAttrs pkgs.stdenv.isLinux {
-              LD_LIBRARY_PATH = lib.makeLibraryPath pkgs.pythonManylinuxPackages.manylinux1;
-            };
-          shellHook = ''
-            unset PYTHONPATH
-          '';
         };
       }
     );
