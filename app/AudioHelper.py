@@ -8,13 +8,13 @@ class AudioHelper:
         self.channels = 1
         self.rate = 44100
 
-        self.audio = PyAudio()
+        self.pyaudio = None
+        self.stream = None
         self.buf = bytearray()
 
-        self.stream: PyAudio = None
-
-    def start_stream(self):
-        self.stream = self.audio.open(
+    def _start_stream(self):
+        self.pyaudio = PyAudio()
+        self.stream = self.pyaudio.open(
             format=self.format,
             channels=self.channels,
             rate=self.rate,
@@ -22,25 +22,34 @@ class AudioHelper:
             frames_per_buffer=self.chunk_size,
         )
 
-    def stop_stream(self):
+    def _stop_stream(self):
         self.stream.stop_stream()
         self.stream.close()
+        self.pyaudio.terminate()
+        self.stream = None
+        self.pyaudio = None
 
-    def clear_buffer(self):
+    def _clear_buffer(self):
         self.buf.clear()
 
     def record(self, time: int):
-        self.clear_buffer()
-        self.start_stream()
-
+        self._start_stream()
+        if self.stream is None:
+            raise AttributeError(
+                "Stream is not started. Please call _start_stream first."
+            )
+        self._clear_buffer()
         for _ in range(0, int(self.rate / self.chunk_size * time)):
             data = self.stream.read(self.chunk_size)
             self.buf.extend(data)
-
-        self.stop_stream()
+        self._stop_stream()
 
     def listen(self):
-        self.start_stream()
+        self._start_stream()
+        if self.stream is None:
+            raise AttributeError(
+                "Stream is not started. Please call _start_stream first."
+            )
         data = self.stream.read(self.chunk_size)
-        self.stop_stream()
+        self._stop_stream()
         return data
