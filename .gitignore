@@ -7,3 +7,5 @@
 .direnv
 *.raw
 result
+.pytest_cache
+__pycache__
