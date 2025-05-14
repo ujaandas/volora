@@ -177,7 +177,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
   Serial.print("Received: ");
   for (int i = 0; i < size; i += 64)
   {
-    // Serial.printf("0x%02X ", rxpacket[i]);
+    // Serial.printf("0x%02X", rxpacket[i]);
     Serial.write((uint8_t *)&rxpacket[i], min(64, size - i));
     delay(1);
   }
