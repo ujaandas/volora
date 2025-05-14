@@ -112,7 +112,7 @@ def main():
                 print(f"Encoded audio to {len(encoded_data)} bytes.")
 
                 print("Sending encoded audio data...")
-                ser.write(encoded_data)
+                ser.write((encoded_data.hex() + "\n").encode())
 
             if ser.in_waiting > 0:
                 print("Receiving encoded audio data from serial...")
