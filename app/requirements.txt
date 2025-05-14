@@ -1,0 +1,6 @@
+keyboard
+pyaudio
+soxr
+numpy
+pyserial
+pycodec2
