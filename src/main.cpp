@@ -28,6 +28,8 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr);
 
 typedef enum
 {
+typedef enum
+{
   LOWPOWER,
   STATE_RX,
   STATE_TX
@@ -48,8 +50,14 @@ void SendingtheNextChunktobesent()
 {
   if (!sendingInChunks)
     return;
+void SendingtheNextChunktobesent()
+{
+  if (!sendingInChunks)
+    return;
 
   int start = chunkIndex * MAX_CHUNK_SIZE;
+  if (start >= fullMessage.length())
+  {
   if (start >= fullMessage.length())
   {
     Serial.println("All chunks sent.");
@@ -70,10 +78,13 @@ void SendingtheNextChunktobesent()
 
 void setup()
 {
+void setup()
+{
   Serial.begin(115200);
   Mcu.begin(HELTEC_BOARD, SLOW_CLK_TPYE);
 
   Rssi = 0;
+  state = STATE_RX; // Start in listening mode
   state = STATE_RX; // Start in listening mode
 
   RadioEvents.TxDone = OnTxDone;
@@ -95,7 +106,11 @@ void setup()
 
 void loop()
 {
+void loop()
+{
   // Check for serial input
+  if (Serial.available())
+  {
   if (Serial.available())
   {
     serialInput = Serial.readStringUntil('\n');
@@ -103,14 +118,22 @@ void loop()
 
     if (serialInput.length() > 0)
     {
+    if (serialInput.length() > 0)
+    {
       fullMessage = serialInput;
       chunkIndex = 0;
       sendingInChunks = true;
       retry_count = 0;
       SendingtheNextChunktobesent(); // 👈 Send the first chunk
+      SendingtheNextChunktobesent(); // 👈 Send the first chunk
     }
   }
 
+  switch (state)
+  {
+  case STATE_TX:
+    // This state is now managed inside sendNextChunk
+    break;
   switch (state)
   {
   case STATE_TX:
@@ -121,11 +144,20 @@ void loop()
     Radio.Rx(0); // Always listening
     state = LOWPOWER;
     break;
+  case STATE_RX:
+    Radio.Rx(0); // Always listening
+    state = LOWPOWER;
+    break;
 
   case LOWPOWER:
     Radio.IrqProcess(); // Handle radio events
     break;
+  case LOWPOWER:
+    Radio.IrqProcess(); // Handle radio events
+    break;
 
+  default:
+    break;
   default:
     break;
   }
@@ -133,12 +165,20 @@ void loop()
 
 void OnTxDone(void)
 {
+void OnTxDone(void)
+{
   Serial.println("TX done.");
   chunkIndex++;
   if (sendingInChunks && (chunkIndex * MAX_CHUNK_SIZE < fullMessage.length()))
   {
     delay(100); // Short delay between chunks
+  if (sendingInChunks && (chunkIndex * MAX_CHUNK_SIZE < fullMessage.length()))
+  {
+    delay(100); // Short delay between chunks
     SendingtheNextChunktobesent();
+  }
+  else
+  {
   }
   else
   {
@@ -150,9 +190,17 @@ void OnTxDone(void)
 
 void OnTxTimeout(void)
 {
+void OnTxTimeout(void)
+{
   Serial.println("TX timeout occurred.");
   retry_count++;
   Serial.printf("Retry attempt: %d\n", retry_count);
+  if (retry_count < max_retries)
+  {
+    SendingtheNextChunktobesent(); // Retry same chunk
+  }
+  else
+  {
   if (retry_count < max_retries)
   {
     SendingtheNextChunktobesent(); // Retry same chunk
@@ -167,6 +215,8 @@ void OnTxTimeout(void)
 
 void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 {
+void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
+{
   size_t copyLength = min((size_t)size, (size_t)(BUFFER_SIZE - 1));
   memcpy(rxpacket, payload, copyLength);
   rxpacket[copyLength] = '\0';
@@ -176,6 +226,9 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
   Serial.println();
   Serial.printf("Received size: %d bytes\n", size);
   Serial.print("Received: ");
+  for (int i = 0; i < size; i += 64)
+  {
+    // Serial.printf("0x%02X", rxpacket[i]);
   for (int i = 0; i < size; i += 64)
   {
     // Serial.printf("0x%02X", rxpacket[i]);
