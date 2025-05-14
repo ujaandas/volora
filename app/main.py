@@ -1,5 +1,10 @@
+from AudioHelper import AudioHelper
+
+
 def main():
-    print("Hello, Volora!")
+    audio = AudioHelper()
+    sound = audio.record(3)
+    audio.play(sound)
 
 
 if __name__ == "__main__":

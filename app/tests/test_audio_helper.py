@@ -1,5 +1,5 @@
-from app.AudioHelper import AudioHelper
 import unittest
+from app.AudioHelper import AudioHelper
 
 
 class TestAudioHelper(unittest.TestCase):
@@ -49,17 +49,16 @@ class TestAudioHelper(unittest.TestCase):
             self.audio_helper.chunk_size
             * (self.audio_helper.rate // self.audio_helper.chunk_size)
             * 1
-            * 2,  # since format is paInt16 (2 bytes per sample),
+            * 2,
         )
 
-    def test_listen(self):
-        self.audio_helper._start_stream()
-        data = self.audio_helper.listen()
-        self.assertIsInstance(data, bytes)
-        self.assertGreater(len(data), 0)
+    def test_play(self):
+        recorded = self.audio_helper.record(1)
+        try:
+            self.audio_helper.play(recorded)
+        except Exception as e:
+            self.fail(f"play method raised an exception: {e}")
 
-    def test_record_and_listen(self):
-        self.audio_helper.record(1)
-        data = self.audio_helper.listen()
-        self.assertIsInstance(data, bytes)
-        self.assertGreater(len(data), 0)
+
+if __name__ == "__main__":
+    unittest.main()
