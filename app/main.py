@@ -10,7 +10,7 @@ import struct
 
 def main():
     try:
-        ser = serial.Serial(port="/dev/ttys008", baudrate=115200, timeout=0)
+        ser = serial.Serial(port="/dev/tty.usbserial-0001", baudrate=115200, timeout=0)
     except Exception as e:
         print("Error opening serial port:", e)
         return
