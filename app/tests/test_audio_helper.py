@@ -58,7 +58,3 @@ class TestAudioHelper(unittest.TestCase):
             self.audio_helper.play(recorded)
         except Exception as e:
             self.fail(f"play method raised an exception: {e}")
-
-
-if __name__ == "__main__":
-    unittest.main()

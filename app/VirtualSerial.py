@@ -2,8 +2,9 @@ import queue
 
 
 class VirtualSerial:
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self._buffer = queue.Queue()
+        self.is_open = True
 
     def write(self, data: bytes) -> int:
         for b in data:
@@ -26,3 +27,6 @@ class VirtualSerial:
     @property
     def in_waiting(self) -> int:
         return self._buffer.qsize()
+
+    def close(self):
+        self.is_open = False
