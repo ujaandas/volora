@@ -174,7 +174,7 @@ def main():
     last_sent_data = None
 
     try:
-        ser = serial.Serial(port="/dev/tty.usbserial-0001", baudrate=115200, timeout=1)
+        ser = serial.Serial(port="/dev/tty.usbserial-4", baudrate=115200, timeout=1)
     except Exception as e:
         print("Error opening serial port:", e)
         return

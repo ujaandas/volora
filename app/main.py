@@ -52,8 +52,7 @@ def serial_read(ser):
 
 def main():
     try:
-        ser1 = serial.Serial(port="/dev/tty.usbserial-0001", baudrate=115200, timeout=1)
-        ser2 = serial.Serial(port="/dev/tty.usbserial-4", baudrate=115200, timeout=1)
+        ser = serial.Serial(port="/dev/tty.usbserial-0001", baudrate=115200, timeout=1)
     except Exception as e:
         print("Error opening serial port:", e)
         return
@@ -140,11 +139,11 @@ def main():
                 print(f"Encoded audio to {len(encoded_data)} bytes.")
                 print("Sending encoded audio data over serial...")
                 last_sent_data = encoded_data
-                serial_send(ser1, encoded_data)
+                serial_send(ser, encoded_data)
 
-            if ser2.in_waiting:
+            if ser.in_waiting:
                 print("Receiving encoded audio data from serial...")
-                incoming_encoded_data = serial_read(ser2)
+                incoming_encoded_data = serial_read(ser)
                 print(
                     f"Received complete message of length {len(incoming_encoded_data)} bytes."
                 )
@@ -166,8 +165,8 @@ def main():
     except KeyboardInterrupt:
         print("Exiting...")
     finally:
-        ser1.close()
-        ser2.close()
+        ser.close()
+        ser.close()
         p1.terminate()
 
 
