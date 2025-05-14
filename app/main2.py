@@ -174,12 +174,7 @@ def main():
     last_sent_data = None
 
     try:
-        ser_send = serial.Serial(
-            port="/dev/tty.usbserial-0001", baudrate=115200, timeout=1
-        )
-        ser_recv = serial.Serial(
-            port="/dev/tty.usbserial-4", baudrate=115200, timeout=1
-        )
+        ser = serial.Serial(port="/dev/tty.usbserial-0001", baudrate=115200, timeout=1)
     except Exception as e:
         print("Error opening serial port:", e)
         return
@@ -205,12 +200,12 @@ def main():
 
                 to_send = file_read(SEND_CHANNEL_FILE)
                 if to_send:
-                    serial_send(ser_send, to_send)
+                    serial_send(ser, to_send)
                     last_sent_data = to_send
                 time.sleep(0.5)
 
-            if ser_recv.in_waiting:
-                received_payload = serial_read(ser_recv)
+            if ser.in_waiting:
+                received_payload = serial_read(ser)
                 print(
                     f"[Serial Receive] Received {len(received_payload)} bytes of encoded data."
                 )
@@ -247,8 +242,7 @@ def main():
     except KeyboardInterrupt:
         print("Exiting...")
     finally:
-        ser_send.close()
-        ser_recv.close()
+        ser.close()
 
 
 if __name__ == "__main__":
