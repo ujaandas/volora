@@ -3,7 +3,7 @@ import threading
 import time
 
 # Serial port configuration
-SERIAL_PORT = '/dev/cu.usbserial-6'  # Change this to match your device
+SERIAL_PORT = "/dev/cu.usbserial-4"  # Change this to match your device
 BAUD_RATE = 115200
 CHUNK_SIZE = 128
 
@@ -18,6 +18,7 @@ ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
 received_buffer = ""
 buffer_lock = threading.Lock()
 
+
 def read_from_node():
     """Reads incoming data, detects complete messages with markers, and writes to file."""
     global received_buffer
@@ -25,11 +26,13 @@ def read_from_node():
     try:
         while True:
             if ser.in_waiting:
-                data = ser.read(ser.in_waiting).decode(errors='ignore')
+                data = ser.read(ser.in_waiting).decode(errors="ignore")
                 with buffer_lock:
                     received_buffer += data
 
-                    while START_TOKEN in received_buffer and END_TOKEN in received_buffer:
+                    while (
+                        START_TOKEN in received_buffer and END_TOKEN in received_buffer
+                    ):
                         start_idx = received_buffer.find(START_TOKEN) + len(START_TOKEN)
                         end_idx = received_buffer.find(END_TOKEN)
 
@@ -43,12 +46,15 @@ def read_from_node():
                             print(f"[LoRa RX] {message}")
 
                             # Remove the processed message from buffer
-                            received_buffer = received_buffer[end_idx + len(END_TOKEN):]
+                            received_buffer = received_buffer[
+                                end_idx + len(END_TOKEN) :
+                            ]
             else:
                 time.sleep(0.01)
 
     except Exception as e:
         print("Read error:", e)
+
 
 def write_to_node_from_file(filename="message2.raw"):
     """Reads data from a file, wraps with start/end tokens, and sends over serial."""
@@ -59,11 +65,11 @@ def write_to_node_from_file(filename="message2.raw"):
         # Wrap with tokens
         full_message = START_TOKEN.encode() + raw_data + END_TOKEN.encode()
 
-                # Send in chunks
+        # Send in chunks
         for i in range(0, len(full_message), CHUNK_SIZE):
-            chunk = full_message[i:i + CHUNK_SIZE] + b"\n"
+            chunk = full_message[i : i + CHUNK_SIZE] + b"\n"
             ser.write(chunk)
-            #time.sleep(0.2)
+            # time.sleep(0.2)
             ser.flush()
             time.sleep(0.1)
 
@@ -74,7 +80,8 @@ def write_to_node_from_file(filename="message2.raw"):
     except Exception as e:
         print(f"Error while sending: {e}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     print(f"Connected to LoRa node on {SERIAL_PORT}")
     print("Press Enter to send 'message2.raw' (Ctrl+C to exit).")
 
@@ -86,7 +93,7 @@ if __name__ == '__main__':
         while True:
             input("⏎  Press Enter to send the file: ")
             write_to_node_from_file("message2.raw")
-            
+
     finally:
         ser.close()
         print("Serial connection closed.")
