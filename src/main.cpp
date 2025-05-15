@@ -251,7 +251,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 #define TX_OUTPUT_POWER 5      // dBm
 
 #define LORA_BANDWIDTH 0
-#define LORA_SPREADING_FACTOR 5
+#define LORA_SPREADING_FACTOR 12
 #define LORA_CODINGRATE 1
 #define LORA_PREAMBLE_LENGTH 8
 #define LORA_SYMBOL_TIMEOUT 0
@@ -314,7 +314,6 @@ void loop()
   if (Serial.available())
   {
     serialInput = Serial.readStringUntil('\n');
-    serialInput.trim();
 
     if (serialInput.length() > 0 && serialInput.length() < BUFFER_SIZE)
     {
@@ -353,30 +352,27 @@ void loop()
 
 void OnTxDone(void)
 {
-  Serial.println("TX done.");
-  Serial.printf("Bytes sent: %d\n", strlen(txpacket));
+  //Serial.println("TX done.");
+  //Serial.printf("Bytes sent: %d\n", strlen(txpacket));
   state = STATE_RX;
 }
 
 void OnTxTimeout(void)
 {
-  Serial.println("TX timeout occurred.");
+ // Serial.println("TX timeout occurred.");
   state = STATE_RX;
 }
 
 void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 {
-  size_t copyLength = min((size_t)size, (size_t)(BUFFER_SIZE - 1));
+  size_t copyLength = (size_t)size;
   memcpy(rxpacket, payload, copyLength);
   rxpacket[copyLength] = '\0';
 
   Radio.Sleep();
 
-  for (int i = 0; i < size; i += 64)
-  {
-    Serial.write((uint8_t *)&rxpacket[i], min(64, size - i));
-    delay(1);
-  }
+  Serial.write((uint8_t *)&rxpacket, copyLength);
+  //Serial.printf("Bytes received: %d\n", size);
 
   state = STATE_RX;
 }
