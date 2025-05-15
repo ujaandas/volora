@@ -14,9 +14,9 @@ END_TOKEN = "cooliobroskiomg"
 CHUNK_SIZE = 128
 
 
-RECORD_FILE = "recorded_audio.raw"
-SEND_CHANNEL_FILE = "send_channel.hex"
-RECEIVED_CHANNEL_FILE = "received_channel.hex"
+RECORD_FILE = "recorded_audio1.raw"
+SEND_CHANNEL_FILE = "send_channel1.hex"
+RECEIVED_CHANNEL_FILE = "received_channel1.hex"
 
 
 def serial_send(ser, data):
@@ -174,7 +174,7 @@ def main():
     last_sent_data = None
 
     try:
-        ser = serial.Serial(port="/dev/tty.usbserial-4", baudrate=115200, timeout=1)
+        ser = serial.Serial(port="/dev/tty.usbserial-0001", baudrate=115200, timeout=1)
     except Exception as e:
         print("Error opening serial port:", e)
         return
@@ -182,74 +182,42 @@ def main():
     print("Starting combined serial & file-based walkie-talkie mode...")
     try:
         while True:
-            if keyboard.is_pressed("space"):
-                record_audio_to_file(RECORD_FILE)
-
-                with open(RECORD_FILE, "rb") as f:
-                    audio_data = f.read()
-                print(f"[Send] Read {len(audio_data)} bytes from '{RECORD_FILE}'.")
-                downsampled_data = downsample(audio_data)
-                print(f"[Send] Downsampled audio to {len(downsampled_data)} bytes.")
-                encoded_data = encode_audio(
-                    downsampled_data, c2, PACKET_SIZE, STRUCT_FORMAT
-                )
-                print(f"[Send] Encoded audio to {len(encoded_data)} bytes.")
-                print(f"[Send] Encoded audio {encoded_data}")
-
-                file_send(encoded_data, SEND_CHANNEL_FILE)
-
-                to_send = file_read(SEND_CHANNEL_FILE)
-                if to_send:
-                    serial_send(ser, to_send)
-                    last_sent_data = to_send
-                time.sleep(0.5)
 
             if ser.in_waiting:
-                line = ser.readline()
-                if b"TX done." in line:
-                    print("TX done")
-                    bytes_line = ser.readline()
-                    try:
-                        bytes_sent = int(bytes_line.strip().split(b":")[1])
-                        print(f"Bytes sent: {bytes_sent}")
-                    except Exception:
-                        print("Could not parse bytes sent.")
-                elif b"TX timeout occurred." in line:
-                    print("TX timeout occurred")
-                else:
-                    received_payload = serial_read(ser)
-                    print(
-                        f"[Serial Receive] Received {len(received_payload)} bytes of encoded data."
-                    )
-                    write_channel_file(received_payload, RECEIVED_CHANNEL_FILE)
+                print("Entered serial.in_waiting")
+                received_payload = serial_read(ser)
+                print(
+                    f"[Serial Receive] Received {len(received_payload)} bytes of encoded data."
+                )
+                write_channel_file(received_payload, RECEIVED_CHANNEL_FILE)
 
-                    incoming_encoded = file_read(RECEIVED_CHANNEL_FILE)
-                    if incoming_encoded:
-                        print(
-                            f"[Receive] Extracted {len(incoming_encoded)} bytes from '{RECEIVED_CHANNEL_FILE}'."
+                incoming_encoded = file_read(RECEIVED_CHANNEL_FILE)
+                if incoming_encoded:
+                    print(
+                        f"[Receive] Extracted {len(incoming_encoded)} bytes from '{RECEIVED_CHANNEL_FILE}'."
+                    )
+                    if last_sent_data is not None:
+                        similarity = (
+                            sum(
+                                1
+                                for i, j in zip(last_sent_data, incoming_encoded)
+                                if i == j
+                            )
+                            / max(len(last_sent_data), len(incoming_encoded))
+                            * 100
                         )
-                        if last_sent_data is not None:
-                            similarity = (
-                                sum(
-                                    1
-                                    for i, j in zip(last_sent_data, incoming_encoded)
-                                    if i == j
-                                )
-                                / max(len(last_sent_data), len(incoming_encoded))
-                                * 100
-                            )
-                            print(
-                                f"[Compare] Similarity between last sent and received data: {similarity:.2f}%"
-                            )
-                        try:
-                            decoded_audio = decode_audio(incoming_encoded, c2)
-                            print(f"[Receive] Received data {incoming_encoded}")
-                            print(
-                                f"[Receive] Decoded audio into {len(decoded_audio)} bytes."
-                            )
-                            playback(decoded_audio, rate=8000)
-                        except Exception as e:
-                            print("Error decoding received audio:", e)
+                        print(
+                            f"[Compare] Similarity between last sent and received data: {similarity:.2f}%"
+                        )
+                    try:
+                        decoded_audio = decode_audio(incoming_encoded, c2)
+                        print(f"[Receive] Received data {incoming_encoded}")
+                        print(
+                            f"[Receive] Decoded audio into {len(decoded_audio)} bytes."
+                        )
+                        playback(decoded_audio, rate=8000)
+                    except Exception as e:
+                        print("Error decoding received audio:", e)
             time.sleep(0.01)
     except KeyboardInterrupt:
         print("Exiting...")

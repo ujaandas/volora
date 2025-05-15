@@ -263,6 +263,7 @@ void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t snr)
 
 char txpacket[BUFFER_SIZE];
 char rxpacket[BUFFER_SIZE];
+size_t bytesSent = 0;
 
 static RadioEvents_t RadioEvents;
 
@@ -328,11 +329,12 @@ void loop()
   {
   case STATE_TX:
     if (messagePending)
-    {
-      Radio.Send((uint8_t *)txpacket, strlen(txpacket));
-      messagePending = false;
-      state = LOWPOWER;
-    }
+      {
+        bytesSent = strlen(txpacket);   // Save length here before sending
+        Radio.Send((uint8_t *)txpacket, bytesSent);
+        messagePending = false;
+        state = LOWPOWER;
+      }
     break;
 
   case STATE_RX:
@@ -351,7 +353,8 @@ void loop()
 
 void OnTxDone(void)
 {
-  // Serial.println("TX done.");
+  Serial.println("TX done.");
+  Serial.printf("Bytes sent: %d\n", strlen(txpacket));
   state = STATE_RX;
 }
 
