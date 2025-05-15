@@ -1,173 +1,115 @@
-import time
-import serial
-import keyboard
-import pyaudio
+import struct
+import argparse
+from pyaudio import PyAudio, paInt16
 import numpy as np
 import soxr
-import pycodec2
-import struct
+from pycodec2 import Codec2
+import serial
+import time
+import keyboard
 
 
-def calculate_similarity(sent: bytes, received: bytes) -> float:
-    if not sent and not received:
-        return 100.0
-    min_len = min(len(sent), len(received))
-    matches = sum(1 for i in range(min_len) if sent[i] == received[i])
-    similarity = matches / max(len(sent), len(received)) * 100
-    return similarity
+def record_and_send(ser, c2):
+    p = PyAudio()
+    stream = p.open(
+        format=paInt16,
+        channels=1,
+        rate=44100,
+        input=True,
+        frames_per_buffer=1024,
+    )
+    print("Recording audio...")
+    frames = []
+    for i in range(0, int(44100 / 1024 * 3)):
+        data = stream.read(1024)
+        frames.append(data)
+    print("Recording stopped.")
+    stream.stop_stream()
+    stream.close()
+    p.terminate()
 
+    print("Downsampling audio...")
+    audio_arr = np.frombuffer(b"".join(frames), dtype=np.int16)
+    downsampled_bytes = soxr.resample(audio_arr, 44100, 8000).tobytes()
 
-START_TOKEN = "bananariptide123"
-END_TOKEN = "cooliobroskiomg"
-CHUNK_SIZE = 128
+    print("Encoding/decoding audio with Codec2...")
+    pkt_struct = f"{c2.samples_per_frame()}h"
+    encoded_frames = []
+    for i in range(0, len(downsampled_bytes), 2 * c2.samples_per_frame()):
+        packet = downsampled_bytes[i : i + 2 * c2.samples_per_frame()]
+        if len(packet) != 2 * c2.samples_per_frame():
+            print(f"Skipping incomplete frame at index {i}")
+            break
+        samples = np.array(struct.unpack(pkt_struct, packet), dtype=np.int16)
+        encoded_frames.append(c2.encode(samples))
 
+    print("Sending encoded audio over serial...")
+    for frame in encoded_frames:
+        ser.write(frame.hex())
+    ser.write(b"\n")
+    ser.flush()
 
-def serial_send(ser, data):
-    full_message = START_TOKEN.encode() + data + END_TOKEN.encode()
-    for i in range(0, len(full_message), CHUNK_SIZE):
-        chunk = full_message[i : i + CHUNK_SIZE] + b"\n"
-        ser.write(chunk)
-        ser.flush()
-        time.sleep(0.1)
-    print(f"[Sent] {len(data)} bytes of data.")
-
-
-def serial_read(ser):
-    buffer = b""
-    start_token = START_TOKEN.encode()
-    end_token = END_TOKEN.encode()
-    while True:
-        if ser.in_waiting:
-            data = ser.read(ser.in_waiting)
-            buffer += data
-            if start_token in buffer and end_token in buffer:
-                start_idx = buffer.find(start_token) + len(start_token)
-                end_idx = buffer.find(end_token)
-                if start_idx < end_idx:
-                    message = buffer[start_idx:end_idx]
-                    buffer = buffer[end_idx + len(end_token) :]
-                    return message
-        time.sleep(0.01)
+    print(f"Bytes sent: {len(b''.join(encoded_frames))}")
 
 
 def main():
-    try:
-        ser = serial.Serial(port="/dev/tty.usbserial-0001", baudrate=115200, timeout=1)
-    except Exception as e:
-        print("Error opening serial port:", e)
-        return
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--port", default="/dev/ttys005", help="Serial port to use")
+    parser.add_argument("--key", default="space", help="Key to start/stop recording")
+    args = parser.parse_args()
+    port = args.port
+    print(f"Sending data to {port}...")
 
-    p1 = pyaudio.PyAudio()
-    c2 = pycodec2.Codec2(1200)
-    pkt_size = c2.samples_per_frame() * 2
-    pkt_fmt = "{}h".format(c2.samples_per_frame())
+    ser = serial.Serial(port, baudrate=115200, timeout=0)
+    p_out = PyAudio()
+    out_stream = p_out.open(
+        format=paInt16,
+        channels=1,
+        rate=8000,
+        output=True,
+    )
 
-    last_sent_data = None
+    c2 = Codec2(1200)
+    encoded_frame_size = c2.bits_per_frame() // 8
+    expected_length = 444
+    received_buffer = b""
 
-    def record_audio():
-        print("Recording started...")
-        s1 = p1.open(
-            format=pyaudio.paInt16,
-            channels=1,
-            rate=44100,
-            input=True,
-            frames_per_buffer=1024,
-        )
-        frames = []
-        try:
-            while keyboard.is_pressed("space"):
-                data = s1.read(1024)
-                frames.append(data)
-        finally:
-            print("Recording stopped.")
-            s1.stop_stream()
-            s1.close()
-        return b"".join(frames)
+    while True:
+        if keyboard.is_pressed(args.key):
+            record_and_send(ser, c2)
+            while keyboard.is_pressed(args.key):
+                time.sleep(0.1)
 
-    def downsample(audio_data, input_rate=44100, output_rate=8000):
-        audio_array = np.frombuffer(audio_data, dtype=np.int16)
-        downsampled_audio = soxr.resample(audio_array, input_rate, output_rate)
-        return downsampled_audio.tobytes()
-
-    def encode_audio(audio_data):
-        print("Encoding audio with Codec2...")
-        encoded_frames = []
-
-        for i in range(0, len(audio_data), pkt_size):
-            packet = audio_data[i : i + pkt_size]
-            if len(packet) != pkt_size:
+        if ser.in_waiting:
+            new_data = ser.read(bytes.fromhex(ser.in_waiting))
+            received_buffer += new_data
+            print(
+                f"Received {len(new_data)} bytes this round, total = {len(received_buffer)} bytes"
+            )
+            if len(received_buffer) >= expected_length:
                 break
-            samples = np.array(struct.unpack(pkt_fmt, packet), dtype=np.int16)
-            encoded_frames.append(c2.encode(samples))
-        return b"".join(encoded_frames)
+        time.sleep(0.01)
 
-    def decode_audio(encoded_data):
-        print("Decoding audio with Codec2...")
-        decoded_samples = []
-        encoded_frame_size = c2.bits_per_frame() // 8
-        for i in range(0, len(encoded_data), encoded_frame_size):
-            encoded_frame = encoded_data[i : i + encoded_frame_size]
-            if len(encoded_frame) != encoded_frame_size:
-                break
-            decoded_samples.append(c2.decode(encoded_frame))
-        decoded_audio = np.concatenate(decoded_samples).astype(np.int16)
-        return decoded_audio.tobytes()
+    print("Received all sent bytes")
 
-    def playback(data, rate=8000):
-        print("Playing back received data...")
-        s2 = p1.open(
-            format=pyaudio.paInt16,
-            channels=1,
-            rate=rate,
-            output=True,
-        )
-        s2.write(data)
-        s2.stop_stream()
-        s2.close()
+    print("Decoding received audio...")
+    decoded_frames = []
 
-    print("Starting walkie-talkie mode...")
-    try:
-        while True:
-            if keyboard.is_pressed("space"):
-                time.sleep(0.01)
-                audio_data = record_audio()
-                print(f"Captured {len(audio_data)} bytes of audio data.")
-                print("Downsampling audio data...")
-                downsampled_data = downsample(audio_data)
-                print(f"Downsampled audio to {len(downsampled_data)} bytes.")
-                encoded_data = encode_audio(downsampled_data)
-                print(f"Encoded audio to {len(encoded_data)} bytes.")
-                print("Sending encoded audio data over serial...")
-                last_sent_data = encoded_data
-                serial_send(ser, encoded_data)
+    for i in range(0, len(received_buffer), encoded_frame_size):
+        frame = received_buffer[i : i + encoded_frame_size]
+        if len(frame) != encoded_frame_size:
+            print(f"Skipping incomplete frame at index {i}")
+            break
+        decoded_frames.append(c2.decode(frame))
 
-            if ser.in_waiting:
-                print("Receiving encoded audio data from serial...")
-                incoming_encoded_data = serial_read(ser)
-                print(
-                    f"Received complete message of length {len(incoming_encoded_data)} bytes."
-                )
-                if last_sent_data is not None:
-                    similarity = calculate_similarity(
-                        last_sent_data, incoming_encoded_data
-                    )
-                    print(
-                        f"Similarity between sent and received data: {similarity:.2f}%"
-                    )
-                try:
-                    decoded_audio = decode_audio(incoming_encoded_data)
-                    print(f"Decoded audio to {len(decoded_audio)} bytes.")
-                    playback(decoded_audio, rate=8000)
-                except Exception as e:
-                    print("Error decoding audio:", e)
+    decoded_bytes = b"".join(decoded_frames)
+    decoded_audio = np.frombuffer(decoded_bytes, dtype=np.int16)
 
-            time.sleep(0.01)
-    except KeyboardInterrupt:
-        print("Exiting...")
-    finally:
-        ser.close()
-        ser.close()
-        p1.terminate()
+    print("Playing received audio...")
+    out_stream.write(decoded_audio.tobytes())
+    out_stream.stop_stream()
+    out_stream.close()
+    p_out.terminate()
 
 
 if __name__ == "__main__":
